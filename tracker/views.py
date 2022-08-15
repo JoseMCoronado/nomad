@@ -5,16 +5,6 @@ from tracker.models import Expense
 
 
 def dashboard(self):
-    """
-    create_dict = {
-        "transaction_id": str(uuid.uuid4()),
-        "category_id": ExpenseCategory(pk=1),
-        "name": "Uber Trip " + str(uuid.uuid4()),
-        "date": datetime.now(),
-        "amount": 23.45,
-    }
-    Expense.objects.create(**create_dict)
-    """
 
     expense_set = (
         Expense.objects.filter(amount__gte=0)

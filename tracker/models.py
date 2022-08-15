@@ -9,6 +9,7 @@ class ExpenseCategory(models.Model):
 
     class Meta:
         db_table = "tracker_expense_category"
+        ordering = ["name"]
 
 
 class Expense(models.Model):
@@ -35,3 +36,4 @@ class Expense(models.Model):
 
     class Meta:
         db_table = "tracker_expense"
+        ordering = ["-date"]

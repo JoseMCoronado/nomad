@@ -1,3 +1,3 @@
 # nomad
 
-- [] Automatically crease postgresql database from cli option
+- [ ] Automatically crease postgresql database from cli option

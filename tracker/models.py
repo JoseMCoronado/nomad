@@ -18,7 +18,9 @@ class Expense(models.Model):
         db_index=True,
         max_length=255,  # unique=True
     )
-    category_id = models.ForeignKey(ExpenseCategory, on_delete=models.PROTECT)
+    category_id = models.ForeignKey(
+        ExpenseCategory, on_delete=models.PROTECT, related_name="expense_ids"
+    )
     name = models.CharField(max_length=255, db_index=True)
     date = models.DateField()
     amount = models.DecimalField(max_digits=9, decimal_places=2)

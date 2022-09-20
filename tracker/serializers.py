@@ -3,7 +3,19 @@ from rest_framework import serializers
 from tracker.models import Expense, ExpenseCategory
 
 
-class ExpenseCategorySerializer(serializers.ModelSerializer):
+class BaseModelSerializer(serializers.ModelSerializer):
+    object_type = serializers.SerializerMethodField(
+        method_name="get_object_type", read_only=True
+    )
+
+    def get_object_type(self, obj):
+        return obj.__class__.__name__.lower()
+
+    class Meta:
+        fields = ["object_type", "id"]
+
+
+class ExpenseCategorySerializer(BaseModelSerializer):
 
     expenses_count = serializers.IntegerField(read_only=True)
     category_url = serializers.HyperlinkedRelatedField(
@@ -14,10 +26,14 @@ class ExpenseCategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ExpenseCategory
-        fields = ["id", "name", "expenses_count", "category_url"]
+        fields = BaseModelSerializer.Meta.fields + [
+            "name",
+            "expenses_count",
+            "category_url",
+        ]
 
 
-class ExpenseSerializer(serializers.ModelSerializer):
+class ExpenseSerializer(BaseModelSerializer):
 
     month = serializers.SerializerMethodField(
         method_name="get_date_month", read_only=True
@@ -49,8 +65,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Expense
-        fields = [
-            "id",
+        fields = BaseModelSerializer.Meta.fields + [
             "expense_url",
             "transaction_id",
             "name",

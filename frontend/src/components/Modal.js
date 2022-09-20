@@ -36,9 +36,9 @@ export default class CustomModal extends Component {
   };
 
   handleSelect = (e) => {
-    let { id, name } = e;
+    let { id } = e;
 
-    const activeItem = { ...this.state.activeItem, ['category_id']: id };
+    const activeItem = { ...this.state.activeItem, 'category_id': id };
 
     this.setState({ activeItem });
   };

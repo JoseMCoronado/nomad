@@ -1,6 +1,7 @@
 import React, { Component } from "react";
 import Modal from "./components/Modal";
 import axios from "axios";
+import { withAlert } from 'react-alert'
 
 class App extends Component {
   constructor(props) {
@@ -26,11 +27,9 @@ class App extends Component {
     axios
       .get("/tracker/categories/")
       .then((res) => this.setState({ categoryList: res.data }))
-      .catch((err) => alert(err.response.data.error));
     axios
       .get("/tracker/expenses/")
       .then((res) => this.setState({ expenseList: res.data.results }))
-      .catch((err) => alert(err.response.data.error));
   };
 
   toggle = () => {
@@ -49,26 +48,29 @@ class App extends Component {
       url = url + `${item.id}/`
       axios
         .put(url, item)
-        .catch((err) => alert(JSON.stringify(err.response.data)))
+        .then((res) => this.props.alert.success('Record Updated'))
+        .catch((err) => this.props.alert.error(JSON.stringify(err.response.data)))
         .then((res) => this.refreshList());
       return;
     }
     axios
       .post(url, item)
-      .catch((err) => alert(JSON.stringify(err.response.data)))
+      .then((res) => this.props.alert.success('Record Created'))
+      .catch((err) => this.props.alert.error(JSON.stringify(err.response.data)))
       .then((res) => this.refreshList());
   };
 
   handleDelete = (item) => {
     var url = "";
-    if (this.state.model_name === 'Expense Category') {
+    if (item.object_type === 'expensecategory') {
       url = `/tracker/categories/${item.id}/`
     } else {
       url = `/tracker/expenses/${item.id}/`
     }
     axios
       .delete(url)
-      .catch((err) => alert(err.response.data.error))
+      .then((res) => this.props.alert.info('Record Deleted'))
+      .catch((err) => this.props.alert.error(err.response.data.error))
       .then((res) => this.refreshList());
   };
 
@@ -95,7 +97,7 @@ class App extends Component {
   };
 
   editExpense = (item) => {
-    this.setState({ model_name: 'Expenese', action_name: 'Edit', activeItem: item, modal: !this.state.modal });
+    this.setState({ model_name: 'Expense', action_name: 'Edit', activeItem: item, modal: !this.state.modal });
   };
 
   displayState = (status) => {
@@ -199,6 +201,8 @@ class App extends Component {
 
 
   render() {
+
+
     return (
       <main className="container">
         <h1 className="text-black text-uppercase text-center my-4">Expenses</h1>
@@ -253,4 +257,4 @@ class App extends Component {
   }
 }
 
-export default App;
+export default withAlert()(App);

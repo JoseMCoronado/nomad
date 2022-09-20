@@ -15,7 +15,7 @@ from tracker.serializers import ExpenseSerializer, ExpenseCategorySerializer
 
 
 class ExpensePagination(PageNumberPagination):
-    page_size = 5
+    page_size = 500
 
 
 class ExpenseViewSet(ModelViewSet):

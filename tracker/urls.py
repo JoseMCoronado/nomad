@@ -9,5 +9,4 @@ router.register("categories", views.ExpenseCategoryViewSet)
 urlpatterns = [
     path(r"", include(router.urls)),
     path("dashboard", views.dashboard),
-    path("dashboard/", views.dashboard),
 ]

@@ -2,3 +2,5 @@ django
 django-debug-toolbar
 djangorestframework
 django-filter
+django-cors-headers
+plaid-python

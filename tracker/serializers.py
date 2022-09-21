@@ -1,6 +1,5 @@
 from rest_framework import serializers
-
-from tracker.models import Expense, ExpenseCategory
+from tracker.models import Expense, ExpenseCategory, PlaidItem, ConfigParameter
 
 
 class BaseModelSerializer(serializers.ModelSerializer):
@@ -13,6 +12,25 @@ class BaseModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         fields = ["object_type", "id"]
+
+
+class ConfigParameterSerializer(BaseModelSerializer):
+    class Meta:
+        model = ConfigParameter
+        fields = BaseModelSerializer.Meta.fields + [
+            "key",
+            "value",
+        ]
+
+
+class PlaidItemSerializer(BaseModelSerializer):
+    class Meta:
+        model = PlaidItem
+        fields = BaseModelSerializer.Meta.fields + [
+            "access_token",
+            "item_id",
+            "request_id",
+        ]
 
 
 class ExpenseCategorySerializer(BaseModelSerializer):

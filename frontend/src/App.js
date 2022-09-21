@@ -1,12 +1,14 @@
 import React, { Component } from "react";
 import Modal from "./components/Modal";
 import axios from "axios";
-import { withAlert } from 'react-alert'
+import { withAlert } from 'react-alert';
+import { PlaidLink } from 'react-plaid-link';
 
 class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
+      plaidLinkToken: {},
       viewState: 'pending',
       categoryList: [],
       expenseList: [],
@@ -19,9 +21,23 @@ class App extends Component {
     };
   }
 
+  handleOnSuccess(token, metadata) {
+    axios
+      .post("/tracker/exchange_public_token", { 'public_token': token, 'metadata': metadata })
+  }
+  handleOnExit() {
+  }
+
   componentDidMount() {
     this.refreshList();
+    this.retrievePlaidLinkToken();
   }
+
+  retrievePlaidLinkToken = () => {
+    axios
+      .post("/tracker/create_link_token", {})
+      .then((res) => this.setState({ plaidLinkToken: res.data }))
+  };
 
   refreshList = () => {
     axios
@@ -78,6 +94,14 @@ class App extends Component {
     const item = { name: "" };
 
     this.setState({ model_name: 'Expense Category', action_name: 'Create', activeItem: item, modal: !this.state.modal });
+  };
+
+  syncExpense = () => {
+    axios
+      .get("/tracker/get_plaid_transaction")
+      .then((res) => this.props.alert.info(res.data))
+      .catch((err) => this.props.alert.error(JSON.stringify(err.response.data)))
+      .then((res) => this.refreshList());
   };
 
   createExpense = () => {
@@ -201,13 +225,22 @@ class App extends Component {
 
 
   render() {
-
-
     return (
       <main className="container">
         <h1 className="text-black text-uppercase text-center my-4">Expenses</h1>
         <div className="row">
-
+          <PlaidLink
+            clientName="Nomad"
+            env="sandbox"
+            product={["auth", "transactions"]}
+            token={this.state.plaidLinkToken.link_token}
+            onExit={this.handleOnExit}
+            onSuccess={this.handleOnSuccess}
+          >
+            Connect a Bank
+          </PlaidLink>
+        </div>
+        <div className="row">
           <div className="mx-auto p-0">
             <div className="card p-3">
               <div className="mb-4">
@@ -232,6 +265,12 @@ class App extends Component {
                   onClick={this.createExpense}
                 >
                   Add Expense
+                </button>
+                <button
+                  className="btn btn-primary float-right"
+                  onClick={this.syncExpense}
+                >
+                  Sync Expenses
                 </button>
               </div>
               {this.renderTabList()}

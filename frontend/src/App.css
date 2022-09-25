@@ -28,6 +28,42 @@
   color: #61dafb;
 }
 
+.react-calendar-heatmap .color-selected { fill: #2596be; }
+.react-calendar-heatmap .color-void { fill: #f8f8f8; }
+.react-calendar-heatmap .color-empty { fill: #eeeeee; }
+.react-calendar-heatmap .color-good-scale-0 { fill: #eeeeee; }
+.react-calendar-heatmap .color-good-scale-1 { fill: #d6e685; }
+.react-calendar-heatmap .color-good-scale-2 { fill: #8cc665; }
+.react-calendar-heatmap .color-good-scale-3 { fill: #e6573d; }
+.react-calendar-heatmap .color-good-scale-4 { fill: #f3ab9e; }
+/* .react-calendar-heatmap .color-good-scale-3 { fill: #44a340; } */
+/* .react-calendar-heatmap .color-good-scale-4 { fill: #1e6823; } */
+.react-calendar-heatmap .color-bad-scale-0 { fill: #eeeeee; }
+.react-calendar-heatmap .color-bad-scale-1 { fill: #f3ab9e; }
+.react-calendar-heatmap .color-bad-scale-2 { fill: #e6573d; }
+.react-calendar-heatmap .color-bad-scale-3 { fill: #e02d0c; }
+.react-calendar-heatmap .color-bad-scale-4 { fill: #b3240a; }
+
+.react-calendar-heatmap .schengen-0 { fill: #eeeeee; }
+.react-calendar-heatmap .schengen-1 { fill: #bcdbe6; }
+.react-calendar-heatmap .schengen-2 { fill: #a6cfdd; }
+.react-calendar-heatmap .schengen-3 { fill: #90c3d5; }
+.react-calendar-heatmap .schengen-4 { fill: #7ab7cd; }
+.react-calendar-heatmap .schengen-5 { fill: #64abc4; }
+.react-calendar-heatmap .schengen-6 { fill: #2187ab; }
+.react-calendar-heatmap .schengen-7 { fill: #e02d0c; }
+
+.react-calendar-heatmap .expense-budget-0 { fill: #eeeeee; }
+.react-calendar-heatmap .expense-budget-1 { fill: #87abfc; }
+.react-calendar-heatmap .expense-budget-2 { fill: #969ce3; }
+.react-calendar-heatmap .expense-budget-3 { fill: #a58cc9; }
+.react-calendar-heatmap .expense-budget-4 { fill: #b47db0; }
+.react-calendar-heatmap .expense-budget-5 { fill: #c36e96; }
+.react-calendar-heatmap .expense-budget-6 { fill: #d25e7d; }
+.react-calendar-heatmap .expense-budget-7 { fill: #e14f63; }
+.react-calendar-heatmap .expense-budget-8 { fill: #f03f4a; }
+.react-calendar-heatmap .expense-budget-9 { fill: #ff3030; }
+
 @keyframes App-logo-spin {
   from {
     transform: rotate(0deg);

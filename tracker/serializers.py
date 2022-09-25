@@ -1,5 +1,15 @@
 from rest_framework import serializers
-from tracker.models import Expense, ExpenseCategory, PlaidItem, ConfigParameter
+from tracker.models import (
+    Expense,
+    ExpenseCategory,
+    PlaidItem,
+    ConfigParameter,
+    ConfigCountry,
+    ConfigState,
+    ConfigCity,
+    TrackerStay,
+    ExpenseItem,
+)
 
 
 class BaseModelSerializer(serializers.ModelSerializer):
@@ -12,6 +22,43 @@ class BaseModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         fields = ["object_type", "id"]
+
+
+class ConfigCountrySerializer(BaseModelSerializer):
+    class Meta:
+        model = ConfigCountry
+        fields = "__all__"
+
+
+class ConfigStateSerializer(BaseModelSerializer):
+    class Meta:
+        model = ConfigState
+        fields = "__all__"
+
+
+class ConfigCitySerializer(BaseModelSerializer):
+    state_name = serializers.StringRelatedField(
+        source="state_id.name",
+        read_only=True,
+    )
+    country_name = serializers.StringRelatedField(
+        source="state_id.country_id.name",
+        read_only=True,
+    )
+    display_name = serializers.SerializerMethodField(
+        method_name="_name_get", read_only=True
+    )
+
+    def _name_get(self, city):
+        return "%s %s (%s)" % (
+            city.state_id.country_id.unicodeFlag,
+            city.name,
+            city.state_id.name,
+        )
+
+    class Meta:
+        model = ConfigCity
+        fields = "__all__"
 
 
 class ConfigParameterSerializer(BaseModelSerializer):
@@ -30,6 +77,7 @@ class PlaidItemSerializer(BaseModelSerializer):
             "access_token",
             "item_id",
             "request_id",
+            "transaction_sync_cursor",
         ]
 
 
@@ -49,6 +97,24 @@ class ExpenseCategorySerializer(BaseModelSerializer):
             "expenses_count",
             "category_url",
         ]
+
+
+class TrackerStaySerializer(BaseModelSerializer):
+    display_name = serializers.SerializerMethodField(
+        method_name="_name_get", read_only=True
+    )
+
+    def _name_get(self, stay):
+        return "%s %s (%s -> %s)" % (
+            stay.city_id.state_id.country_id.unicodeFlag,
+            stay.city_id.name,
+            stay.date_start,
+            stay.date_end,
+        )
+
+    class Meta:
+        model = TrackerStay
+        fields = "__all__"
 
 
 class ExpenseSerializer(BaseModelSerializer):
@@ -92,8 +158,16 @@ class ExpenseSerializer(BaseModelSerializer):
             "year",
             "amount",
             "category_id",
+            "stay_id",
+            "expense_classification",
             # "category_detail",
             "category_name",
             "category_url",
             "state",
         ]
+
+
+class ExpenseItemSerializer(BaseModelSerializer):
+    class Meta:
+        model = ExpenseItem
+        fields = "__all__"

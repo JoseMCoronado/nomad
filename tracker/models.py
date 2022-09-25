@@ -147,7 +147,7 @@ class Expense(models.Model):
 
     class Meta:
         db_table = "tracker_expense"
-        ordering = ["-date"]
+        ordering = ["date"]
 
 
 class TrackCategory(models.Model):

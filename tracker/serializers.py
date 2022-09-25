@@ -168,6 +168,33 @@ class ExpenseSerializer(BaseModelSerializer):
 
 
 class ExpenseItemSerializer(BaseModelSerializer):
+    expense_classification = serializers.StringRelatedField(
+        source="expense_id.expense_classification",
+        read_only=True,
+    )
+    display_name = serializers.SerializerMethodField(
+        method_name="_name_get", read_only=True
+    )
+    date_string = serializers.SerializerMethodField(
+        method_name="_date_string_get", read_only=True
+    )
+
+    def _date_string_get(self, record):
+        return "%s %s" % (record.date.strftime("%m/%d/%y"), record.date.strftime("%A"))
+
+    def _name_get(self, record):
+        name = "%s" % (record.expense_id.name)
+        if record.expense_id.stay_id:
+            stay = record.expense_id.stay_id
+            name = "%s spread across => %s %s (%s -> %s)" % (
+                name,
+                stay.city_id.state_id.country_id.unicodeFlag,
+                stay.city_id.name,
+                stay.date_start,
+                stay.date_end,
+            )
+        return name
+
     class Meta:
         model = ExpenseItem
         fields = "__all__"

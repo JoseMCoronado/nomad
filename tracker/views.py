@@ -88,7 +88,7 @@ class TrackerStayViewSet(ModelViewSet):
 
 
 class ExpenseItemViewSet(ModelViewSet):
-    queryset = ExpenseItem.objects.all()
+    queryset = ExpenseItem.objects.select_related("expense_id__stay_id__city_id").all()
     serializer_class = ExpenseItemSerializer
 
 
@@ -257,6 +257,7 @@ def get_dates(request, *args, **kwargs):
                     elif ratio > 0:
                         count = 1
 
+            stay_list = []
             if stays:
                 stay_list = [
                     stayobj
@@ -321,10 +322,14 @@ def get_dates(request, *args, **kwargs):
                 count = -1
             date_string = "%s %s" % (date.strftime("%m/%d/%y"), date.strftime("%A"))
             budget_diff = budget - amount
+            stay_record = False
+            if stay_list:
+                stay_record = stay_list[-1].id
             dateDict = {
                 "date": date,
                 "dateString": date_string,
                 "cityStay": city_stay,
+                "stayId": stay_record,
                 "totalAmount": amount,
                 "budget": budget,
                 "budgetDiff": budget_diff,

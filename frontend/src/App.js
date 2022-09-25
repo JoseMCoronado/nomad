@@ -17,8 +17,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faGlobe, faTruckPlane, faHouseCircleCheck, faMugHot, faAnglesRight, faAnglesLeft, faAngleLeft, faAngleRight, faBriefcase } from '@fortawesome/free-solid-svg-icons'
 
 
-function Table({ columns, data, defaultPage }) {
+function Table(props) {
   // Use the state and functions returned from useTable to build your UI
+  const columns = props.columns
+  const data = props.data
+  const defaultPage = props.defaultPage
   const {
     getTableProps,
     getTableBodyProps,
@@ -56,14 +59,6 @@ function Table({ columns, data, defaultPage }) {
     usePagination,
   )
 
-  const editExpense = (cell) => {
-    const item = cell.row.original
-    if (item.stay_id) {
-      axios.get("/tracker/stays/" + String(item.stay_id)).then((res) => this.setState({ model_name: 'Expense', action_name: 'Edit', activeItem: item, modal: !this.state.modal, defaultStay: res.data }))
-    } else {
-      this.setState({ model_name: 'Expense', action_name: 'Edit', activeItem: item, modal: !this.state.modal, defaultStay: false });
-    }
-  };
 
   return (
     <>
@@ -104,9 +99,11 @@ function Table({ columns, data, defaultPage }) {
           {page.map((row, i) => {
             prepareRow(row)
             return (
-              <tr {...row.getRowProps()}>
+              <tr {...row.getRowProps({
+                onClick: e => props.onRowClicked && props.onRowClicked(row, e),
+              })}>
                 {row.cells.map(cell => {
-                  return <td {...cell.getCellProps()} onClick={() => editExpense(cell)} > {cell.render('Cell')}</td>
+                  return <td {...cell.getCellProps()} > {cell.render('Cell')}</td>
                 })}
               </tr>
             )
@@ -178,10 +175,12 @@ class App extends Component {
       stayList: [],
       categoryList: [],
       expenseList: [],
+      expenseItemList: [],
       modal: false,
+      viewNotebookState: 'daily',
       defaultCity: false,
       defaultStay: false,
-      now: new Date().getFullYear() + "-" + (new Date().getMonth() + 1) + "-" + new Date().getDate(),
+      now: new Date().toISOString().split('T')[0],
       model_name: "",
       action_name: "",
       activeItem: {
@@ -221,6 +220,9 @@ class App extends Component {
     axios
       .get("/tracker/expenses/")
       .then((res) => this.setState({ expenseList: res.data.results }))
+    axios
+      .get("/tracker/items/")
+      .then((res) => this.setState({ expenseItemList: res.data }))
   };
 
   toggle = () => {
@@ -229,8 +231,7 @@ class App extends Component {
 
   handleHeatmapClick = (value) => {
     if (value && value.date) {
-      var transfromDate = new Date(value.date);
-      this.setState({ now: transfromDate });
+      this.setState({ now: value.date });
       this.refreshList();
     }
   };
@@ -329,9 +330,34 @@ class App extends Component {
     }
   };
 
+  editStayFromTable = (row, e) => {
+    const item = this.state.stayList.filter(obj => obj.id === row.original.stayId)[0]
+    if (item) {
+      axios.get("/tracker/cities/" + String(item.city_id)).then((res) => this.setState({ model_name: 'Stay', action_name: 'Edit', activeItem: item, modal: !this.state.modal, defaultCity: res.data }))
+    }
+  };
+
+  editExpenseFromTable = (row, e) => {
+    const item = this.state.expenseList.filter(obj => obj.id === row.original.expense_id)[0]
+    console.log(item)
+    if (item) {
+      if (item.stay_id) {
+        axios.get("/tracker/stays/" + String(item.stay_id)).then((res) => this.setState({ model_name: 'Expense', action_name: 'Edit', activeItem: item, modal: !this.state.modal, defaultStay: res.data }))
+      } else {
+        this.setState({ model_name: 'Expense', action_name: 'Edit', activeItem: item, modal: !this.state.modal, defaultStay: false });
+      }
+    }
+  };
+
   displayState = (status) => {
     const state = status;
     return this.setState({ viewState: state });
+  };
+
+  displayNotebookState = (status) => {
+    const state = status;
+    this.setState({ viewNotebookState: state })
+    return
   };
 
   displayHeatmapState = (status) => {
@@ -535,31 +561,26 @@ class App extends Component {
   render() {
     const columns = [
       {
-        Header: 'ID',
-        accessor: 'id',
-      },
-      {
         Header: 'Date',
-        accessor: 'date',
+        accessor: 'date_string',
       },
       {
         Header: 'Label',
-        accessor: 'name',
+        accessor: 'display_name',
       },
       {
-        Header: 'Category',
-        accessor: 'category_id',
+        Header: 'Expense ID',
+        accessor: 'expense_id',
+      },
+      {
+        Header: 'Classification',
+        accessor: 'expense_classification',
       },
       {
         Header: 'Amount',
         accessor: 'amount',
       },
-      {
-        Header: 'State',
-        accessor: 'state',
-      },
     ];
-    const data = this.state.expenseList
     var dateColumns = [
       {
         Header: 'Date',
@@ -582,11 +603,22 @@ class App extends Component {
 
     var defaultDatePage = 0
     const dateData = this.state.dateList
+    const datePageSize = 10
     if (dateData[0]) {
       var firstDate = new Date(dateData[0].date);
       var dateDiff = Math.ceil(Math.abs(firstDate - new Date(this.state.now)) / (1000 * 60 * 60 * 24));
-      defaultDatePage = Math.floor(dateDiff / 10);
+      defaultDatePage = Math.floor(dateDiff / datePageSize);
     }
+    const preData = this.state.expenseItemList
+
+    var expenseItemListLow = new Date(this.state.now)
+    expenseItemListLow.setDate(expenseItemListLow.getDate() - 3);
+    var expenseItemListHigh = new Date(this.state.now)
+    expenseItemListHigh.setDate(expenseItemListHigh.getDate() + 3);
+
+    const data = preData.filter(obj => obj.date >= expenseItemListLow.toISOString().split('T')[0]).filter(obj => obj.date <= expenseItemListHigh.toISOString().split('T')[0])
+
+
     var afterDate = new Date(this.state.now)
     afterDate.setDate(afterDate.getDate() + 180);
     var priorDate = new Date(this.state.now)
@@ -662,12 +694,15 @@ class App extends Component {
       </div>
     )
 
-    var tableStyle = {
+    const tableStyle = {
       width: '100%',
+    };
+    const actionButtonStyle = {
+      marginRight: '5px',
     };
     return (
       <main className="container">
-        <h2 className="text-black text-uppercase my-4">Nomad</h2>
+        <h2 className="text-black my-4">nomad</h2>
         <div className="row float-right">
           <div className="col-12 mx-auto p-0 ">
             <PlaidLink
@@ -688,17 +723,49 @@ class App extends Component {
         {this.renderHeatmapOptions()}
         {heatmapSection}
         <ReactTooltip multiline={true} />
-        <div className="row">
-          <div className="mx-auto p-0" style={tableStyle}>
-            <Table columns={dateColumns} data={dateData} defaultPage={defaultDatePage} />
-          </div>
+
+        <Tabs
+          id="dashboard-notebook"
+          activeKey={this.state.viewNotebookState}
+          onSelect={(k) => this.displayNotebookState(k)}
+          className="mb-3"
+        >
+          <Tab eventKey="daily" title="Daily">
+            <div className="mx-auto p-0" style={tableStyle}>
+              <Table columns={dateColumns} data={dateData} defaultPage={defaultDatePage} onRowClicked={this.editStayFromTable} />
+            </div>
+
+          </Tab>
+          <Tab eventKey="expenseDetail" title="Expense Detail">
+            <div className="mx-auto p-0" style={tableStyle}>
+              <Table columns={columns} data={data} defaultPage={0} onRowClicked={this.editExpenseFromTable} />
+            </div>
+          </Tab>
+        </Tabs>
+        <div className="row float-right">
+          <Button
+            className="btn btn-info float-right"
+            onClick={this.createStay}
+            style={actionButtonStyle}
+          >
+            Add Stay
+          </Button>
+          <Button
+            className="btn btn-primary float-right me-3"
+            onClick={this.createExpense}
+            style={actionButtonStyle}
+          >
+            Create Expenses
+          </Button>
+          <Button
+            className="btn btn-success float-right me-3"
+            onClick={this.syncExpense}
+            style={actionButtonStyle}
+          >
+            Sync Expenses
+          </Button>
         </div>
-        <div className="row">
-          <div className="mx-auto p-0" style={tableStyle}>
-            <Table columns={columns} data={data} defaultPage='0' />
-          </div>
-        </div>
-        <div className="row">
+        {/* <div className="row">
 
           <div className="mx-auto p-0">
             <div className="card p-3">
@@ -716,7 +783,7 @@ class App extends Component {
             </div>
           </div>
 
-          {/* <div className="mx-auto p-0">
+          <div className="mx-auto p-0">
             <div className="card p-3">
               <div className="mb-4">
                 <button
@@ -730,7 +797,7 @@ class App extends Component {
                 {this.renderExpenseCategories()}
               </ul>
             </div>
-          </div> */}
+          </div>
 
           <div className="mx-auto p-0">
             <div className="card p-3">
@@ -755,7 +822,7 @@ class App extends Component {
             </div>
           </div>
 
-        </div>
+        </div> */}
         {
           this.state.modal ? (
             <Modal

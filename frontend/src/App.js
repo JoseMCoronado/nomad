@@ -1,5 +1,6 @@
 import React, { Component } from "react";
 import Modal from "./components/Modal";
+import TransactionSyncDateModal from "./components/TransactionSyncDateModal";
 import axios from "axios";
 import { withAlert } from 'react-alert';
 import { PlaidLink } from 'react-plaid-link';
@@ -15,7 +16,17 @@ import Tab from 'react-bootstrap/Tab';
 import Tabs from 'react-bootstrap/Tabs';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faGlobe, faTruckPlane, faHouseCircleCheck, faMugHot, faAnglesRight, faAnglesLeft, faAngleLeft, faAngleRight, faBriefcase } from '@fortawesome/free-solid-svg-icons'
+import "./spinner.css"
 
+
+function LoadingSpinner() {
+  return (
+    <div className="spinner-container">
+      <div className="loading-spinner">
+      </div>
+    </div>
+  );
+};
 
 function Table(props) {
   // Use the state and functions returned from useTable to build your UI
@@ -177,6 +188,8 @@ class App extends Component {
       expenseList: [],
       expenseItemList: [],
       modal: false,
+      transactionSyncDateModal: false,
+      plaidSyncLoading: false,
       viewNotebookState: 'daily',
       defaultCity: false,
       defaultStay: false,
@@ -229,6 +242,10 @@ class App extends Component {
     this.setState({ modal: !this.state.modal, defaultCity: false, defaultStay: false });
   };
 
+  transactionSynceDateToggle = () => {
+    this.setState({ transactionSyncDateModal: !this.state.transactionSyncDateModal });
+  };
+
   handleHeatmapClick = (value) => {
     if (value && value.date) {
       this.setState({ now: value.date });
@@ -262,6 +279,27 @@ class App extends Component {
       .then((res) => this.refreshList());
   };
 
+  togglePlaidSyncLoading = () => {
+    this.setState({ plaidSyncLoading: !this.state.plaidSyncLoading });
+  };
+
+  handleTransactionSyncDateSubmit = (item) => {
+    const startDate = new Date(item['date_start'])
+    const endDate = new Date(item['date_end'])
+    const dateError = endDate < startDate
+    if (dateError) {
+      return alert("Date Error: End date must be after the start date.");
+    }
+    this.transactionSynceDateToggle();
+    this.togglePlaidSyncLoading();
+    axios
+      .get("/tracker/get_plaid_transaction_at_date", { params: { 'start_date': item['date_start'], 'end_date': item['date_end'] } })
+      .then((res) => this.props.alert.info(res.data))
+      .catch((err) => this.props.alert.error(JSON.stringify(err.response.data)))
+      .then((res) => this.togglePlaidSyncLoading())
+      .then((res) => this.refreshList())
+  };
+
   handleDelete = (item) => {
     var url = "";
     if (item.object_type === 'expensecategory') {
@@ -283,11 +321,17 @@ class App extends Component {
   };
 
   syncExpense = () => {
+    this.togglePlaidSyncLoading();
     axios
       .get("/tracker/get_plaid_transaction")
       .then((res) => this.props.alert.info(res.data))
       .catch((err) => this.props.alert.error(JSON.stringify(err.response.data)))
+      .then((res) => this.togglePlaidSyncLoading())
       .then((res) => this.refreshList());
+  };
+
+  openTransactionSyncDateModal = () => {
+    this.setState({ transactionSyncDateModal: !this.state.transactionSyncDateModal });
   };
 
   createExpense = () => {
@@ -339,7 +383,6 @@ class App extends Component {
 
   editExpenseFromTable = (row, e) => {
     const item = this.state.expenseList.filter(obj => obj.id === row.original.expense_id)[0]
-    console.log(item)
     if (item) {
       if (item.stay_id) {
         axios.get("/tracker/stays/" + String(item.stay_id)).then((res) => this.setState({ model_name: 'Expense', action_name: 'Edit', activeItem: item, modal: !this.state.modal, defaultStay: res.data }))
@@ -602,6 +645,7 @@ class App extends Component {
     ];
 
     var defaultDatePage = 0
+    var defaultExpensePage = 0
     const dateData = this.state.dateList
     const datePageSize = 10
     if (dateData[0]) {
@@ -609,15 +653,23 @@ class App extends Component {
       var dateDiff = Math.ceil(Math.abs(firstDate - new Date(this.state.now)) / (1000 * 60 * 60 * 24));
       defaultDatePage = Math.floor(dateDiff / datePageSize);
     }
-    const preData = this.state.expenseItemList
-
-    var expenseItemListLow = new Date(this.state.now)
-    expenseItemListLow.setDate(expenseItemListLow.getDate() - 3);
-    var expenseItemListHigh = new Date(this.state.now)
-    expenseItemListHigh.setDate(expenseItemListHigh.getDate() + 3);
-
-    const data = preData.filter(obj => obj.date >= expenseItemListLow.toISOString().split('T')[0]).filter(obj => obj.date <= expenseItemListHigh.toISOString().split('T')[0])
-
+    const data = this.state.expenseItemList
+    var nowobj = new Date(this.state.now)
+    var nowstring = nowobj.toISOString().split('T')[0]
+    var index = data.findIndex(object => {
+      return object.date === nowstring;
+    });
+    var tries = 20
+    while (index < 0 && tries > 0) {
+      tries--;
+      nowobj.setDate(nowobj.getDate() - 1)
+      index = data.findIndex(object => {
+        return object.date === nowobj.toISOString().split('T')[0];
+      });
+    }
+    if (index > 0) {
+      defaultExpensePage = Math.floor(index / datePageSize);
+    }
 
     var afterDate = new Date(this.state.now)
     afterDate.setDate(afterDate.getDate() + 180);
@@ -738,7 +790,7 @@ class App extends Component {
           </Tab>
           <Tab eventKey="expenseDetail" title="Expense Detail">
             <div className="mx-auto p-0" style={tableStyle}>
-              <Table columns={columns} data={data} defaultPage={0} onRowClicked={this.editExpenseFromTable} />
+              <Table columns={columns} data={data} defaultPage={defaultExpensePage} onRowClicked={this.editExpenseFromTable} />
             </div>
           </Tab>
         </Tabs>
@@ -761,9 +813,19 @@ class App extends Component {
             className="btn btn-success float-right me-3"
             onClick={this.syncExpense}
             style={actionButtonStyle}
+            disabled={this.state.plaidSyncLoading}
           >
             Sync Expenses
           </Button>
+          <Button
+            className="btn btn-warning float-right me-3"
+            onClick={this.openTransactionSyncDateModal}
+            style={actionButtonStyle}
+            disabled={this.state.plaidSyncLoading}
+          >
+            Sync Dates
+          </Button>
+          {this.state.plaidSyncLoading ? <LoadingSpinner /> : null}
         </div>
         {/* <div className="row">
 
@@ -835,6 +897,14 @@ class App extends Component {
               stayList={this.state.stayList}
               toggle={this.toggle}
               onSave={this.handleSubmit}
+            />
+          ) : null
+        }
+        {
+          this.state.transactionSyncDateModal ? (
+            <TransactionSyncDateModal
+              toggle={this.transactionSynceDateToggle}
+              onSave={this.handleTransactionSyncDateSubmit}
             />
           ) : null
         }

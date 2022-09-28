@@ -43,6 +43,7 @@ from plaid.api import plaid_api
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.transactions_get_request import TransactionsGetRequest
+from plaid.model.transactions_get_request_options import TransactionsGetRequestOptions
 from plaid.model.transactions_sync_request import TransactionsSyncRequest
 from plaid.model.item_public_token_exchange_request import (
     ItemPublicTokenExchangeRequest,
@@ -90,6 +91,14 @@ class TrackerStayViewSet(ModelViewSet):
 class ExpenseItemViewSet(ModelViewSet):
     queryset = ExpenseItem.objects.select_related("expense_id__stay_id__city_id").all()
     serializer_class = ExpenseItemSerializer
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filterset_fields = [
+        "expense_id",
+        "amount",
+        "date",
+    ]
+    search_fields = ["expense_id"]
 
 
 class ConfigParameterViewSet(ModelViewSet):
@@ -519,6 +528,72 @@ def plaidExchangeToken(request):
 
 
 @api_view(["GET"])
+def getPlaidTransactionsForDates(request):
+    if request.method == "GET":
+        message = ""
+        client, client_id = generate_plaid_client()
+        plaid_items = PlaidItem.objects.all()
+        transaction_count = 0
+        now = datetime.now().strftime("%Y-%m-%d")
+        start_data = request.GET.get("start_date", now)
+        end_date = request.GET.get("end_date", now)
+        for item in plaid_items:
+            request = TransactionsGetRequest(
+                access_token=item.access_token,
+                start_date=datetime.strptime(start_data, "%Y-%m-%d").date(),
+                end_date=datetime.strptime(end_date, "%Y-%m-%d").date(),
+                options=TransactionsGetRequestOptions(),
+            )
+            response = client.transactions_get(request)
+            transactions = response["transactions"]
+            while len(transactions) < response["total_transactions"]:
+                request = TransactionsGetRequest(
+                    access_token=item.access_token,
+                    start_date=datetime.strptime(start_data, "%Y-%m-%d").date(),
+                    end_date=datetime.strptime(end_date, "%Y-%m-%d").date(),
+                    options=TransactionsGetRequestOptions(offset=len(transactions)),
+                )
+                response = client.transactions_get(request)
+                transactions.extend(response["transactions"])
+
+            for transaction in transactions:
+                transaction_count += 1
+                expenese_category = ExpenseCategory.objects.filter(
+                    plaid_id=transaction["category_id"]
+                )
+                if expenese_category:
+                    category_id = expenese_category[0]
+                else:
+                    categ_name = " - ".join(transaction["category"])
+                    categ_values = {
+                        "name": categ_name,
+                        "plaid_id": transaction["category_id"],
+                    }
+                    category_id = ExpenseCategory.objects.create(**categ_values)
+                expense = Expense.objects.filter(
+                    transaction_id=transaction["transaction_id"]
+                )
+                values = {
+                    "transaction_id": transaction["transaction_id"],
+                    "category_id": category_id,
+                    "name": transaction["name"],
+                    "plaid_account_id": transaction["account_id"],
+                    "plaid_merchant_name": transaction["merchant_name"],
+                    "plaid_payment_channel": transaction["payment_channel"],
+                    "plaid_iso_currency_code": transaction["iso_currency_code"],
+                    "date": transaction["date"],
+                    "amount": transaction["amount"],
+                    "state": "pending",
+                }
+                if expense and expense[0].state not in ["ignore"]:
+                    expense.update(**values)
+                else:
+                    Expense.objects.create(**values)
+        message += "%s Line(s) Synced" % (transaction_count)
+        return Response(message)
+
+
+@api_view(["GET"])
 def getPlaidTransactions(request):
     if request.method == "GET":
         message = ""
@@ -585,7 +660,7 @@ def getPlaidTransactions(request):
                     expense.update(**values)
                 else:
                     Expense.objects.create(**values)
-        message += "Sync Completed \n %s Trx Created/Updated" % (transaction_count)
+        message += "Sync Completed %s Transactions" % (transaction_count)
         return Response(message)
 
 

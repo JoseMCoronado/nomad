@@ -128,7 +128,12 @@ class Expense(models.Model):
     )
     name = models.CharField(max_length=255, db_index=True)
     plaid_account_id = models.CharField(max_length=255, default="")
-    plaid_merchant_name = models.CharField(max_length=255, default="")
+    plaid_merchant_name = models.CharField(
+        max_length=255,
+        default="",
+        null=True,
+        blank=True,
+    )
     plaid_payment_channel = models.CharField(max_length=255, default="")
     plaid_iso_currency_code = models.CharField(max_length=255, default="")
     date = models.DateField()

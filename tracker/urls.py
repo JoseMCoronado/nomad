@@ -19,6 +19,7 @@ urlpatterns = [
     path("create_link_token", views.plaidLinkToken),
     path("exchange_public_token", views.plaidExchangeToken),
     path("get_plaid_transaction", views.getPlaidTransactions),
+    path("get_plaid_transaction_at_date", views.getPlaidTransactionsForDates),
     path("testendpoint", views.testEndpoint),
     path("get_countries", views.getCountries),
     path("get_states", views.getStates),

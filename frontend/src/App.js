@@ -1,5 +1,6 @@
 import React, { Component } from "react";
 import Modal from "./components/Modal";
+import Navbar from "./components/Navbar/Navbar";
 import TransactionSyncDateModal from "./components/TransactionSyncDateModal";
 import axios from "axios";
 import { withAlert } from 'react-alert';
@@ -15,7 +16,7 @@ import Button from 'react-bootstrap/Button';
 import Tab from 'react-bootstrap/Tab';
 import Tabs from 'react-bootstrap/Tabs';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faGlobe, faTruckPlane, faHouseCircleCheck, faMugHot, faAnglesRight, faAnglesLeft, faAngleLeft, faAngleRight, faBriefcase } from '@fortawesome/free-solid-svg-icons'
+import { faGlobe, faTruckPlane, faHouseCircleCheck, faMugHot, faAnglesRight, faAnglesLeft, faAngleLeft, faAngleRight, faBriefcase, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons'
 import "./spinner.css"
 
 
@@ -196,6 +197,7 @@ class App extends Component {
       now: new Date().toISOString().split('T')[0],
       model_name: "",
       action_name: "",
+      hideSpread: false,
       activeItem: {
         name: "",
       },
@@ -233,8 +235,12 @@ class App extends Component {
     axios
       .get("/tracker/expenses/")
       .then((res) => this.setState({ expenseList: res.data.results }))
+    var hidespread = null
+    if (this.state.hideSpread) {
+      hidespread = true
+    }
     axios
-      .get("/tracker/items/")
+      .get("/tracker/items/", { params: { "expense_id__stay_id__isnull": hidespread } })
       .then((res) => this.setState({ expenseItemList: res.data }))
   };
 
@@ -252,6 +258,16 @@ class App extends Component {
       this.refreshList();
     }
   };
+
+  toggleHideSpread = () => {
+    const change_state_promise = new Promise((resolve, reject) => {
+      resolve(this.setState({ hideSpread: !this.state.hideSpread }));
+      reject("Something went wrong!?");
+    });
+    change_state_promise.then((value) => {
+      this.refreshList()
+    });
+  }
 
   handleSubmit = (item) => {
     this.toggle();
@@ -754,13 +770,14 @@ class App extends Component {
     };
     return (
       <main className="container">
-        <h2 className="text-black my-4">nomad</h2>
+        <Navbar />
+        {/* <h2 className="text-black my-4">nomad</h2> */}
         <div className="row float-right">
           <div className="col-12 mx-auto p-0 ">
             <PlaidLink
               clientName="Nomad"
-              env="sandbox"
-              product={["auth", "transactions"]}
+              env="development"
+              product={["transactions"]}
               token={this.state.plaidLinkToken.link_token}
               onExit={this.handleOnExit}
               onSuccess={this.handleOnSuccess}
@@ -791,6 +808,11 @@ class App extends Component {
           <Tab eventKey="expenseDetail" title="Expense Detail">
             <div className="mx-auto p-0" style={tableStyle}>
               <Table columns={columns} data={data} defaultPage={defaultExpensePage} onRowClicked={this.editExpenseFromTable} />
+              {this.state.hideSpread ?
+                <FontAwesomeIcon onClick={this.toggleHideSpread} className="float-right hidespread" icon={faEyeSlash} />
+                :
+                <FontAwesomeIcon onClick={this.toggleHideSpread} className="float-right hidespread" icon={faEye} />
+              }
             </div>
           </Tab>
         </Tabs>

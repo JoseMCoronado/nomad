@@ -57,7 +57,7 @@ class CityPagination(PageNumberPagination):
 
 
 class ExpensePagination(PageNumberPagination):
-    page_size = 500
+    page_size = 5000
 
 
 class ConfigCountryViewSet(ModelViewSet):
@@ -89,15 +89,13 @@ class TrackerStayViewSet(ModelViewSet):
 
 
 class ExpenseItemViewSet(ModelViewSet):
-    queryset = ExpenseItem.objects.select_related("expense_id__stay_id__city_id").all()
+    queryset = ExpenseItem.objects.select_related(
+        "expense_id__stay_id__city_id__state_id__country_id"
+    ).all()
     serializer_class = ExpenseItemSerializer
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    filterset_fields = [
-        "expense_id",
-        "amount",
-        "date",
-    ]
+    filterset_fields = {"expense_id__stay_id": ["exact", "isnull"]}
     search_fields = ["expense_id"]
 
 
@@ -211,6 +209,7 @@ def get_dates(request, *args, **kwargs):
             )
         date_start_list = [x.date_start for x in stays]
         date_end_list = [x.date_end for x in stays]
+        # TODO: Handle when there is no stay do not allow person to retrieve expenses.
         date = min(date_start_list)
         latest = max(date_end_list)
         now = datetime.now().date()
@@ -237,13 +236,13 @@ def get_dates(request, *args, **kwargs):
             count = 0
             if heatmap_data == "expenses":
                 if budget <= 0:
-                    if abs(amount) > 100:
+                    if (amount) > 100:
                         count = 9
-                    elif abs(amount) > 50:
+                    elif (amount) > 50:
                         count = 8
-                    elif abs(amount) > 25:
+                    elif (amount) > 25:
                         count = 7
-                    elif abs(amount) > 0:
+                    elif (amount) > 0:
                         count = 6
                 else:
                     ratio = amount / budget
@@ -330,7 +329,7 @@ def get_dates(request, *args, **kwargs):
             if date == now:
                 count = -1
             date_string = "%s %s" % (date.strftime("%m/%d/%y"), date.strftime("%A"))
-            budget_diff = budget - amount
+            budget_diff = amount - budget
             stay_record = False
             if stay_list:
                 stay_record = stay_list[-1].id
@@ -578,7 +577,9 @@ def getPlaidTransactionsForDates(request):
                     "category_id": category_id,
                     "name": transaction["name"],
                     "plaid_account_id": transaction["account_id"],
-                    "plaid_merchant_name": transaction["merchant_name"],
+                    "plaid_merchant_name": transaction["merchant_name"]
+                    if transaction["merchant_name"]
+                    else "N/A",
                     "plaid_payment_channel": transaction["payment_channel"],
                     "plaid_iso_currency_code": transaction["iso_currency_code"],
                     "date": transaction["date"],
@@ -649,7 +650,9 @@ def getPlaidTransactions(request):
                     "category_id": category_id,
                     "name": transaction["name"],
                     "plaid_account_id": transaction["account_id"],
-                    "plaid_merchant_name": transaction["merchant_name"],
+                    "plaid_merchant_name": transaction["merchant_name"]
+                    if transaction["merchant_name"]
+                    else "N/A",
                     "plaid_payment_channel": transaction["payment_channel"],
                     "plaid_iso_currency_code": transaction["iso_currency_code"],
                     "date": transaction["date"],

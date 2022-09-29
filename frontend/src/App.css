@@ -24,6 +24,16 @@
   color: white;
 }
 
+.hidespread {
+  color: rgb(152, 152, 152);
+  margin-top: -50px;
+  padding-bottom: 0rem;
+}
+.hidespread:hover {
+  color: black;
+}
+
+
 .App-link {
   color: #61dafb;
 }
@@ -53,7 +63,7 @@
 .react-calendar-heatmap .schengen-6 { fill: #2187ab; }
 .react-calendar-heatmap .schengen-7 { fill: #e02d0c; }
 
-.react-calendar-heatmap .expense-budget-0 { fill: #eeeeee; }
+/* .react-calendar-heatmap .expense-budget-0 { fill: #eeeeee; }
 .react-calendar-heatmap .expense-budget-1 { fill: #87abfc; }
 .react-calendar-heatmap .expense-budget-2 { fill: #969ce3; }
 .react-calendar-heatmap .expense-budget-3 { fill: #a58cc9; }
@@ -62,7 +72,19 @@
 .react-calendar-heatmap .expense-budget-6 { fill: #d25e7d; }
 .react-calendar-heatmap .expense-budget-7 { fill: #e14f63; }
 .react-calendar-heatmap .expense-budget-8 { fill: #f03f4a; }
+.react-calendar-heatmap .expense-budget-9 { fill: #ff3030; } */
+
+.react-calendar-heatmap .expense-budget-0 { fill: #8cc665; }
+.react-calendar-heatmap .expense-budget-1 { fill: #a6d087; }
+.react-calendar-heatmap .expense-budget-2 { fill: #bfdaa9; }
+.react-calendar-heatmap .expense-budget-3 { fill: #d7e4cb; }
+.react-calendar-heatmap .expense-budget-4 { fill: #eeeeee; }
+.react-calendar-heatmap .expense-budget-5 { fill: #f4d1c8; }
+.react-calendar-heatmap .expense-budget-6 { fill: #f5b4a4; }
+.react-calendar-heatmap .expense-budget-7 { fill: #f39681; }
+.react-calendar-heatmap .expense-budget-8 { fill: #ee785e; }
 .react-calendar-heatmap .expense-budget-9 { fill: #ff3030; }
+
 
 @keyframes App-logo-spin {
   from {

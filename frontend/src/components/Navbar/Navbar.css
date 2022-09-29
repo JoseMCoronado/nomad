@@ -1,0 +1,142 @@
+.NavbarItems {
+	height: 80px;
+	display: flex;
+	justify-content: left;
+	align-items: center;
+	font-size: 1.2rem;
+}
+
+.navbar-logo {
+	color: rgb(152, 152, 152);
+	justify-self: start;
+	margin-left: 20px;
+	cursor: pointer;
+	font-size: 1.6rem;
+}
+.navbar-logo:hover {
+	padding-bottom: 0.25rem;
+}
+
+.navbar-logo-icon {
+	padding-bottom: 0.0rem;
+}
+.navbar-logo-icon:hover {
+	padding-bottom: 0.25rem;
+}
+
+.menu-icon {
+	color: rgb(152, 152, 152);
+	display: none;
+}
+
+.exitIcon {
+	color:#ffff;
+	display: none;
+}
+
+.nav-menu {
+	display: grid;
+	grid-template-columns: repeat(3, auto);
+	grid-gap: 10px;
+	list-style: none;
+	text-align: center; 
+	width: 55vw;
+	justify-content: end;
+	margin-right: 0rem; 
+
+}
+
+.nav-links {
+	color: rgb(152, 152, 152);
+	padding-top: 0.5rem;
+	padding-bottom: 0.5rem;
+	padding-right: 1rem;
+	padding-left: 1rem;
+
+}
+
+.nav-links:hover {
+	background-color: rgb(152, 152, 152);
+	color: white;
+	border-radius: 4px;
+	transition: all 0.2s ease-out;
+	text-decoration: none;
+	padding-top: 0.6rem;
+	padding-bottom: 0.6rem;
+	padding-right: 1rem;
+	padding-left: 1rem;
+}
+
+@media screen and (max-width: 600px) {
+	.NavbarItems {
+		position: relative;
+	}
+
+	.nav-menu {
+		display: flex;
+		flex-direction: column;
+		width: 100%;
+		height: 300px;
+		position: absolute;
+		padding: 0rem;
+		top: 75px;
+		left: -70%;
+		opacity:1;
+		transition: all 0.5s ease;
+	}
+	.exitIcon {
+		display: block;
+		position: absolute;
+		top: 0;
+		right: 0;
+		transform: translate(-100%, 60%);
+		font-size: 1.6rem;
+		cursor: pointer;
+	}
+
+	.nav-menu.active {
+		background: rgb(93, 93, 93);
+		left: 0;
+		opacity: 98%;
+		transition: all 0.5s ease;
+		z-index: 1;
+		border-radius: 1%;
+	}
+
+	.nav-links {
+		text-align: center;
+		width: 100%;
+		display: table;
+		padding-top: 2rem;
+		padding-bottom: 2rem;
+		padding-right: 2rem;
+		padding-left: 2rem;
+	}
+
+	.nav-links:hover {
+		background-color:  rgb(152, 152, 152);
+		Width: 100%;
+		border-radius: 1%;
+		padding-top: 2rem;
+		padding-bottom: 2rem;
+		padding-right: 2rem;
+		padding-left: 3rem;
+	}
+	
+	.navbar-logo {
+		position: absolute;
+		top: 0;
+		left: 0;
+		transform: translate(25%, 50%);
+	}
+
+	.menu-icon {
+		display: block;
+		position: absolute;
+		top: 0;
+		right: 0;
+		transform: translate(-100%, 60%);
+		font-size: 1.6rem;
+		cursor: pointer;
+	}
+}

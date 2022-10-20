@@ -1,4 +1,5 @@
-import React, { Component } from "react";
+import React, { Component, useEffect } from "react";
+import Select from 'react-select'
 import Modal from "./components/Modal";
 import Navbar from "./components/Navbar/Navbar";
 import TransactionSyncDateModal from "./components/TransactionSyncDateModal";
@@ -18,6 +19,11 @@ import Tabs from 'react-bootstrap/Tabs';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faGlobe, faTruckPlane, faHouseCircleCheck, faMugHot, faAnglesRight, faAnglesLeft, faAngleLeft, faAngleRight, faBriefcase, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons'
 import "./spinner.css"
+import {
+  Form,
+  FormGroup,
+  Input,
+} from "reactstrap";
 
 
 function LoadingSpinner() {
@@ -188,16 +194,30 @@ class App extends Component {
       categoryList: [],
       expenseList: [],
       expenseItemList: [],
+      planList: [],
+      planItemList: [],
+      expenseItemListUnfiltered: [],
       modal: false,
       transactionSyncDateModal: false,
       plaidSyncLoading: false,
       viewNotebookState: 'daily',
       defaultCity: false,
       defaultStay: false,
+      defaultAvgOption: { value: 'days', label: '# of Days', name: 'defaultAvgOption' },
+      includeAvgDailySpendForecast: true,
+      avgDays: 30,
+      avgManualDailySpend: 0,
+      avgStay: null,
+      avgStartDate: new Date().toISOString().split('T')[0],
+      avgEndDate: new Date().toISOString().split('T')[0],
+      budgetStartDate: new Date().toISOString().split('T')[0],
+      budgetEndDate: new Date().toISOString().split('T')[0],
       now: new Date().toISOString().split('T')[0],
       model_name: "",
       action_name: "",
-      hideSpread: false,
+      avgDailySpend: 0,
+      hideSpread: true,
+      hideFx: true,
       activeItem: {
         name: "",
       },
@@ -223,12 +243,26 @@ class App extends Component {
   };
 
   refreshList = () => {
+
+    var dailySpendComputation = 0
+    if (!this.state.hideFx) {
+      const el = document.getElementById('dailySpendComputation');
+      dailySpendComputation = el.getAttribute("value");
+    }
+
+
     axios
-      .get("/tracker/get_dates", { params: { 'viewHeatmapState': this.state.viewHeatmapState, 'viewHeatmapExpensesState': this.state.viewHeatmapExpensesState } })
-      .then((res) => this.setState({ dateList: res.data }))
+      .get("/tracker/get_dates", { params: { 'viewHeatmapState': this.state.viewHeatmapState, 'viewHeatmapExpensesState': this.state.viewHeatmapExpensesState, 'dailySpendComputation': dailySpendComputation } })
+      .then((res) => this.setState({ dateList: res.data, budgetStartDate: res.data[0].date }))
     axios
       .get("/tracker/categories/")
       .then((res) => this.setState({ categoryList: res.data }))
+    axios
+      .get("/tracker/plan/")
+      .then((res) => this.setState({ planList: res.data }))
+    axios
+      .get("/tracker/planitem/")
+      .then((res) => this.setState({ planItemList: res.data }))
     axios
       .get("/tracker/stays/")
       .then((res) => this.setState({ stayList: res.data }))
@@ -236,12 +270,17 @@ class App extends Component {
       .get("/tracker/expenses/")
       .then((res) => this.setState({ expenseList: res.data.results }))
     var hidespread = null
+    var spreadover = null
     if (this.state.hideSpread) {
       hidespread = true
+      spreadover = false
     }
     axios
-      .get("/tracker/items/", { params: { "expense_id__stay_id__isnull": hidespread } })
+      .get("/tracker/items/", { params: { "expense_id__stay_id__isnull": hidespread, "expense_id__spread_over": spreadover } })
       .then((res) => this.setState({ expenseItemList: res.data }))
+    axios
+      .get("/tracker/items/")
+      .then((res) => this.setState({ expenseItemListUnfiltered: res.data }))
   };
 
   toggle = () => {
@@ -269,13 +308,34 @@ class App extends Component {
     });
   }
 
+  toggleHideFx = () => {
+    const change_state_promise = new Promise((resolve, reject) => {
+      resolve(this.setState({ hideFx: !this.state.hideFx }));
+      reject("Something went wrong!?");
+    });
+    change_state_promise.then((value) => {
+      this.refreshList()
+    });
+  }
+
   handleSubmit = (item) => {
+    if (item['spead_over']) {
+      const startDate = new Date(item['spread_date_start'])
+      const endDate = new Date(item['spread_date_end'])
+      const dateError = endDate < startDate
+      if (dateError) {
+        return alert("Date Error: End date must be after the start date.");
+      }
+    }
+
     this.toggle();
     var url = "";
     if (this.state.model_name === 'Expense Category') {
       url = `/tracker/categories/`
     } else if (this.state.model_name === 'Expense') {
       url = `/tracker/expenses/`
+    } else if (this.state.model_name === 'Plan') {
+      url = `/tracker/plan/`
     } else {
       url = `/tracker/stays/`
     }
@@ -293,6 +353,27 @@ class App extends Component {
       .then((res) => this.props.alert.success('Record Created'))
       .catch((err) => this.props.alert.error(JSON.stringify(err.response.data)))
       .then((res) => this.refreshList());
+  };
+
+  handleModalDelete = (item) => {
+    this.toggle();
+    var url = "";
+    if (this.state.model_name === 'Expense Category') {
+      url = `/tracker/categories/`
+    } else if (this.state.model_name === 'Expense') {
+      url = `/tracker/expenses/`
+    } else if (this.state.model_name === 'Plan') {
+      url = `/tracker/plan/`
+    } else {
+      url = `/tracker/stays/`
+    }
+    url = url + `${item.id}/`
+    axios
+      .delete(url, item)
+      .then((res) => this.props.alert.success('Record Deleted'))
+      .catch((err) => this.props.alert.error(JSON.stringify(err.response.data)))
+      .then((res) => this.refreshList());
+    return;
   };
 
   togglePlaidSyncLoading = () => {
@@ -362,6 +443,15 @@ class App extends Component {
     this.setState({ model_name: 'Expense', action_name: 'Create', activeItem: item, modal: !this.state.modal });
   };
 
+  createPlan = () => {
+    const item = {
+      name: "",
+      date: this.state.now,
+      amount: 0.00,
+    };
+    this.setState({ model_name: 'Plan', action_name: 'Create', activeItem: item, modal: !this.state.modal });
+  };
+
   createStay = () => {
     const item = {
       name: "",
@@ -390,8 +480,16 @@ class App extends Component {
     }
   };
 
-  editStayFromTable = (row, e) => {
+  editStayFromDateTable = (row, e) => {
     const item = this.state.stayList.filter(obj => obj.id === row.original.stayId)[0]
+    const item_date = new Date(row.original.date).toISOString().split('T')[0]
+    if (item) {
+      axios.get("/tracker/cities/" + String(item.city_id)).then((res) => this.setState({ now: item_date, model_name: 'Stay', action_name: 'Edit', activeItem: item, modal: !this.state.modal, defaultCity: res.data }))
+    }
+  };
+
+  editStayFromTable = (row, e) => {
+    const item = row.original
     if (item) {
       axios.get("/tracker/cities/" + String(item.city_id)).then((res) => this.setState({ model_name: 'Stay', action_name: 'Edit', activeItem: item, modal: !this.state.modal, defaultCity: res.data }))
     }
@@ -399,11 +497,23 @@ class App extends Component {
 
   editExpenseFromTable = (row, e) => {
     const item = this.state.expenseList.filter(obj => obj.id === row.original.expense_id)[0]
+    const item_date = new Date(item.date).toISOString().split('T')[0]
     if (item) {
       if (item.stay_id) {
         axios.get("/tracker/stays/" + String(item.stay_id)).then((res) => this.setState({ model_name: 'Expense', action_name: 'Edit', activeItem: item, modal: !this.state.modal, defaultStay: res.data }))
       } else {
-        this.setState({ model_name: 'Expense', action_name: 'Edit', activeItem: item, modal: !this.state.modal, defaultStay: false });
+        this.setState({ now: item_date, model_name: 'Expense', action_name: 'Edit', activeItem: item, modal: !this.state.modal, defaultStay: false });
+      }
+    }
+  };
+
+  editPlanFromTable = (row, e) => {
+    const item = row.original
+    if (item) {
+      if (item.stay_id) {
+        axios.get("/tracker/stays/" + String(item.stay_id)).then((res) => this.setState({ model_name: 'Plan', action_name: 'Edit', activeItem: item, modal: !this.state.modal, defaultStay: res.data }))
+      } else {
+        this.setState({ model_name: 'Plan', action_name: 'Edit', activeItem: item, modal: !this.state.modal, defaultStay: false });
       }
     }
   };
@@ -423,7 +533,7 @@ class App extends Component {
     const state = status;
     axios
       .get("/tracker/get_dates", { params: { 'viewHeatmapState': state, 'viewHeatmapExpensesState': this.state.viewHeatmapExpensesState } })
-      .then((res) => this.setState({ viewHeatmapState: state, dateList: res.data }))
+      .then((res) => this.setState({ viewHeatmapState: state, dateList: res.data, budgetStartDate: res.data[0].date }))
     return
   };
 
@@ -431,7 +541,7 @@ class App extends Component {
     const state = status;
     axios
       .get("/tracker/get_dates", { params: { 'viewHeatmapState': this.state.viewHeatmapState, 'viewHeatmapExpensesState': state } })
-      .then((res) => this.setState({ viewHeatmapExpensesState: state, dateList: res.data }))
+      .then((res) => this.setState({ viewHeatmapExpensesState: state, dateList: res.data, budgetStartDate: res.data[0].date }))
     return
   };
 
@@ -479,6 +589,404 @@ class App extends Component {
         </Tab>
       </Tabs>
 
+    );
+  };
+
+  handleKeyMetricChange = (e) => {
+    let { name, value } = e.target;
+    if (e.target.type === "checkbox") {
+      value = e.target.checked;
+    }
+    this.setState({ [name]: value });
+  };
+
+  handleKeyMetricSelectChange = (e) => {
+    let { name } = e;
+    this.setState({ [name]: e });
+  };
+
+  handleStaySelect = (e) => {
+    this.setState({ avgStay: e });
+  };
+
+  renderKeyMetrics = () => {
+    var formatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+    const nonMiscDailyBudget = 166
+    const miscDailyBudget = 196
+    const totalDailyBudget = miscDailyBudget + nonMiscDailyBudget
+    var checkedFxSelection = this.state.includeAvgDailySpendForecast
+    var avgStartDate = this.state.avgStartDate
+    var avgEndDate = this.state.avgEndDate
+    const budgetStartDate = this.state.budgetStartDate
+    const budgetEndDate = this.state.budgetEndDate
+    const daysForAvgSpend = this.state.avgDays
+    const expenseData = this.state.expenseList
+    const expenseItemData = this.state.expenseItemListUnfiltered
+    const planItemData = this.state.planItemList
+    const defaultAvgOption = this.state.defaultAvgOption
+    var avgDays = 0
+    var avgStay = this.state.avgStay
+    if (!avgStay && this.state.stayList.length > 0) {
+      avgStay = this.state.stayList[0]
+    }
+    var showAvgDays = false
+
+    var inputAvgTh = null
+    var inputAvgTd = null
+
+    var nowDate = new Date().toISOString().split('T')[0]
+    var toDate = null
+    var priorDate = null
+
+    if (defaultAvgOption.value === 'days') {
+      avgDays = daysForAvgSpend
+      toDate = new Date().toISOString().split('T')[0]
+      priorDate = new Date()
+      priorDate.setDate(priorDate.getDate() - daysForAvgSpend);
+      priorDate = priorDate.toISOString().split('T')[0]
+      inputAvgTh = (
+        <th>Days for Avg. Daily Spend</th>
+      )
+      inputAvgTd = (
+        <td>
+          <Form>
+            <FormGroup>
+              <Input
+                type="integer"
+                id="avg-days"
+                name="avgDays"
+                style={{
+                  textAlign: "center",
+                }}
+                value={this.state.avgDays}
+                onChange={this.handleKeyMetricChange}
+              />
+            </FormGroup>
+          </Form>
+        </td>
+      )
+    } else if (defaultAvgOption.value === 'setDates') {
+      priorDate = avgStartDate
+      toDate = avgEndDate
+      avgDays = (Math.ceil(Math.abs(new Date(priorDate) - new Date(toDate)) / (1000 * 60 * 60 * 24))) + 1
+      showAvgDays = true
+      inputAvgTh = (
+        <>
+          <th>From</th>
+          <th>To</th>
+        </>
+      )
+      inputAvgTd = (
+        <>
+          <td>
+            <Form>
+              <FormGroup>
+                <Input
+                  type="date"
+                  id="avg-start-Date"
+                  name="avgStartDate"
+                  style={{
+                    textAlign: "center",
+                  }}
+                  value={avgStartDate}
+                  onChange={this.handleKeyMetricChange}
+                />
+              </FormGroup>
+            </Form>
+          </td>
+          <td>
+            <Form>
+              <FormGroup>
+                <Input
+                  type="date"
+                  id="avg-end-Date"
+                  name="avgEndDate"
+                  style={{
+                    textAlign: "center",
+                  }}
+                  value={avgEndDate}
+                  onChange={this.handleKeyMetricChange}
+                />
+              </FormGroup>
+            </Form>
+          </td>
+        </>
+      )
+    } else if (defaultAvgOption.value === 'manual') {
+      toDate = null
+      priorDate = null
+      avgDays = 0
+      inputAvgTh = (
+        <th>Daily Spend</th>
+      )
+      inputAvgTd = (
+        <td>
+          <Form>
+            <FormGroup>
+              <Input
+                type="float"
+                id="avg-manual-spend"
+                name="avgManualDailySpend"
+                style={{
+                  textAlign: "center",
+                }}
+                value={this.state.avgManualDailySpend}
+                onChange={this.handleKeyMetricChange}
+              />
+            </FormGroup>
+          </Form>
+        </td>
+      )
+    } else if (defaultAvgOption.value === 'stay') {
+      if (avgStay) {
+        priorDate = avgStay.date_start
+        toDate = avgStay.date_end
+        avgDays = (Math.ceil(Math.abs(new Date(priorDate) - new Date(toDate)) / (1000 * 60 * 60 * 24))) + 1
+        showAvgDays = true
+      }
+      inputAvgTh = (
+        <th>Stay</th>
+      )
+      inputAvgTd = (
+        <td>
+          <Form>
+            <FormGroup>
+              <Select
+                id="avg-stay-spend"
+                name="stay_id"
+                className="basic-single"
+                classNamePrefix="select"
+                defaultValue={avgStay}
+                onChange={this.handleStaySelect}
+                isLoading={false}
+                isClearable={true}
+                isSearchable={true}
+                options={this.state.stayList}
+                getOptionLabel={x => x.display_name}
+                getOptionValue={x => x.id}
+              />
+            </FormGroup>
+          </Form>
+        </td>
+      )
+    }
+
+    const budgetDays = Math.ceil(Math.abs(new Date(budgetStartDate) - new Date(budgetEndDate)) / (1000 * 60 * 60 * 24))
+    var budgetNowToEndDays = (Math.ceil(Math.abs(new Date() - new Date(budgetEndDate)) / (1000 * 60 * 60 * 24)))
+    const totalBudget = budgetDays * totalDailyBudget
+    var disabledFxSelection = false
+    if (budgetEndDate <= nowDate) {
+      disabledFxSelection = true
+      budgetNowToEndDays = 0
+      checkedFxSelection = false
+    }
+
+    const expenseSpendAvgSubset = expenseData.filter(
+      x => x.date >= priorDate &&
+        x.date <= toDate &&
+        !x.stay_id &&
+        !x.spread_over &&
+        !x.ignore
+    );
+    const expenseSpendSubset = expenseItemData.filter(
+      x => x.date >= budgetStartDate &&
+        x.date <= budgetEndDate
+    );
+    const planSpendSubset = planItemData.filter(
+      x => x.date >= budgetStartDate &&
+        x.date <= budgetEndDate
+    );
+    const totalSpendAvgAmount = expenseSpendAvgSubset.reduce((accumulator, object) => {
+      return accumulator + object.amount;
+    }, 0)
+    var avgDailySpend = totalSpendAvgAmount / avgDays
+    if (defaultAvgOption.value === 'manual') {
+      avgDailySpend = this.state.avgManualDailySpend
+
+    }
+    var forecastSpend = 0
+    if (checkedFxSelection) {
+      forecastSpend = (avgDailySpend * budgetNowToEndDays)
+    }
+    const totalSpendAmount = (
+      expenseSpendSubset.reduce((accumulator, object) => {
+        return accumulator + object.amount;
+      }, 0) + planSpendSubset.reduce((accumulator, object) => {
+        return accumulator + object.amount;
+      }, 0)
+    )
+    var dailySpendTarget = 0
+    if (budgetNowToEndDays > 0) {
+      dailySpendTarget = (totalBudget - totalSpendAmount) / budgetNowToEndDays
+    }
+    const totalSpendAmountInclFx = totalSpendAmount + forecastSpend
+    const spendBudgetDiff = totalSpendAmountInclFx - totalBudget
+    const spendBudgetDiffPerc = Math.round((spendBudgetDiff / totalBudget) * 100)
+
+    const avgOptions = [
+      { value: 'days', label: '# of Days', name: 'defaultAvgOption' },
+      { value: 'setDates', label: 'Set Dates', name: 'defaultAvgOption' },
+      { value: 'stay', label: 'Based on Stay', name: 'defaultAvgOption' },
+      { value: 'manual', label: 'Manual', name: 'defaultAvgOption' },
+    ]
+
+    var spendTotalAvgTh = (
+      <>
+      </>
+    )
+    if (defaultAvgOption.value !== 'manual') {
+      if (defaultAvgOption.value === 'days') {
+        spendTotalAvgTh = (<th>Spend from {priorDate} to {toDate}</th>)
+      } else {
+        spendTotalAvgTh = (<th>Spend</th>)
+      }
+    }
+
+    return (
+      <div className="row">
+        <div className="col-12 mx-auto p-0 text-center">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>From</th>
+                <th>To</th>
+                <th>Days</th>
+                <th>Incl. Daily Exp. FX</th>
+                <th>Budget</th>
+                {checkedFxSelection ? <th>FX Exp.</th> : null}
+                <th>Expenditure</th>
+                <th>Variance</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <Form>
+                    <FormGroup>
+                      <Input
+                        type="date"
+                        id="start-Date"
+                        name="budgetStartDate"
+                        style={{
+                          textAlign: "center",
+                        }}
+                        value={this.state.budgetStartDate}
+                        onChange={this.handleKeyMetricChange}
+                      />
+                    </FormGroup>
+                  </Form>
+                </td>
+                <td>
+                  <Form>
+                    <FormGroup>
+                      <Input
+                        type="date"
+                        id="end-Date"
+                        name="budgetEndDate"
+                        style={{
+                          textAlign: "center",
+                        }}
+                        value={this.state.budgetEndDate}
+                        onChange={this.handleKeyMetricChange}
+                      />
+                    </FormGroup>
+                  </Form>
+                </td>
+                <td>
+                  {budgetDays}
+                </td>
+                <td>
+                  <div class="form-check form-switch">
+                    <input name="includeAvgDailySpendForecast" onChange={this.handleKeyMetricChange} disabled={disabledFxSelection} checked={checkedFxSelection} class="form-check-input" type="checkbox" id="inclFxForecastInKeyMetrics" />
+                    <label>{budgetNowToEndDays} Days</label>
+                  </div>
+                </td>
+                <td>
+                  {formatter.format(totalBudget)}
+                </td>
+                {checkedFxSelection ?
+                  <td>
+                    {formatter.format(forecastSpend)}
+                  </td>
+                  : null}
+                <td>
+                  {formatter.format(totalSpendAmountInclFx)}
+                </td>
+
+                <td>
+                  {formatter.format(spendBudgetDiff)} ({spendBudgetDiffPerc}%)
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="row">
+          <div className="col-12 mx-auto p-0 text-center">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  {inputAvgTh}
+                  {showAvgDays ?
+                    <th>Days</th>
+                    : null}
+                  {spendTotalAvgTh}
+                  <th>Avg. Daily Spend</th>
+                  {!disabledFxSelection ?
+                    <th>Target Daily Spend</th>
+                    : null}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <FormGroup>
+                      <Select
+                        id="avg-type"
+                        name="defaultAvgOption"
+                        className="basic-single"
+                        classNamePrefix="select"
+                        defaultValue={defaultAvgOption}
+                        onChange={this.handleKeyMetricSelectChange}
+                        isLoading={false}
+                        isClearable={false}
+                        isSearchable={false}
+                        options={avgOptions}
+                        getOptionLabel={x => x.label}
+                        getOptionValue={x => x.value}
+                      />
+                    </FormGroup>
+                  </td>
+                  {inputAvgTd}
+                  {showAvgDays ?
+                    <td>
+                      {avgDays}
+                    </td>
+                    : null}
+                  {defaultAvgOption.value === 'manual' ? null :
+                    <td>
+                      {formatter.format(totalSpendAvgAmount)}
+                    </td>}
+                  <td id="dailySpendComputation" value={avgDailySpend}>
+                    {formatter.format(avgDailySpend)}
+                  </td>
+                  {!disabledFxSelection ?
+                    < td >
+                      {formatter.format(dailySpendTarget)}
+                    </td>
+                    : null}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div >
     );
   };
 
@@ -649,16 +1157,33 @@ class App extends Component {
         Header: 'City',
         accessor: 'cityStay',
       },
-      // {
-      //   Header: 'Schengen Days',
-      //   accessor: 'schengenCount',
-      // },
-      // {
-      //   Header: 'Total Amount',
-      //   accessor: 'totalAmount',
-      // },
-
     ];
+    var planColumns = [
+      {
+        Header: 'Description',
+        accessor: 'display_name',
+      },
+      {
+        Header: 'Amount',
+        accessor: 'amount',
+      },
+    ];
+    const planData = this.state.planList
+    var stayColumns = [
+      {
+        Header: 'Stay',
+        accessor: 'display_name',
+      },
+      {
+        Header: 'State',
+        accessor: 'state_name',
+      },
+      {
+        Header: 'Country',
+        accessor: 'country_name',
+      },
+    ];
+    const stayData = this.state.stayList
 
     var defaultDatePage = 0
     var defaultExpensePage = 0
@@ -744,7 +1269,7 @@ class App extends Component {
       }}
       tooltipDataAttrs={value => {
         return {
-          'data-tip': `${value.cityStay}<br/>${value.dateString}<br/>Expenses: ${value.totalAmount}<br/>${value.message}`,
+          'data-tip': `${value.cityStay}<br/>${value.dateString}<br/>${value.message}`,
         };
       }}
       showMonthLabels={true}
@@ -771,13 +1296,13 @@ class App extends Component {
     return (
       <main className="container">
         <Navbar />
-        {/* <h2 className="text-black my-4">nomad</h2> */}
+        {this.renderKeyMetrics()}
         <div className="row float-right">
           <div className="col-12 mx-auto p-0 ">
             <PlaidLink
               clientName="Nomad"
-              env="development"
-              product={["transactions"]}
+              env="production"
+              product={["auth", "transactions"]}
               token={this.state.plaidLinkToken.link_token}
               onExit={this.handleOnExit}
               onSuccess={this.handleOnSuccess}
@@ -791,8 +1316,7 @@ class App extends Component {
         </div >
         {this.renderHeatmapOptions()}
         {heatmapSection}
-        <ReactTooltip multiline={true} />
-
+        <ReactTooltip clickable={false} place="right" multiline={true} globalEventOff="click" />
         <Tabs
           id="dashboard-notebook"
           activeKey={this.state.viewNotebookState}
@@ -801,8 +1325,13 @@ class App extends Component {
         >
           <Tab eventKey="daily" title="Daily">
             <div className="mx-auto p-0" style={tableStyle}>
-              <Table columns={dateColumns} data={dateData} defaultPage={defaultDatePage} onRowClicked={this.editStayFromTable} />
+              <Table columns={dateColumns} data={dateData} defaultPage={defaultDatePage} onRowClicked={this.editStayFromDateTable} />
             </div>
+            {this.state.hideFx ?
+              <FontAwesomeIcon onClick={this.toggleHideFx} className="float-right hidespread" icon={faEyeSlash} />
+              :
+              <FontAwesomeIcon onClick={this.toggleHideFx} className="float-right hidespread" icon={faEye} />
+            }
 
           </Tab>
           <Tab eventKey="expenseDetail" title="Expense Detail">
@@ -815,15 +1344,34 @@ class App extends Component {
               }
             </div>
           </Tab>
+          <Tab eventKey="plannedExpenses" title="Planned Expenses">
+            <Button
+              className="btn btn-success float-left me-3"
+              onClick={this.createPlan}
+              style={actionButtonStyle}
+            >
+              Create Planned Expense
+            </Button>
+            <div className="mx-auto p-0" style={tableStyle}>
+              <Table columns={planColumns} data={planData} defaultPage={0} onRowClicked={this.editPlanFromTable} />
+            </div>
+
+          </Tab>
+          <Tab eventKey="stays" title="Stays">
+            <Button
+              className="btn btn-info float-left me-3"
+              onClick={this.createStay}
+              style={actionButtonStyle}
+            >
+              Add Stay
+            </Button>
+            <div className="mx-auto p-0" style={tableStyle}>
+              <Table columns={stayColumns} data={stayData} defaultPage={0} onRowClicked={this.editStayFromTable} />
+            </div>
+
+          </Tab>
         </Tabs>
         <div className="row float-right">
-          <Button
-            className="btn btn-info float-right"
-            onClick={this.createStay}
-            style={actionButtonStyle}
-          >
-            Add Stay
-          </Button>
           <Button
             className="btn btn-primary float-right me-3"
             onClick={this.createExpense}
@@ -919,6 +1467,7 @@ class App extends Component {
               stayList={this.state.stayList}
               toggle={this.toggle}
               onSave={this.handleSubmit}
+              onDelete={this.handleModalDelete}
             />
           ) : null
         }

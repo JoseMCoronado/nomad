@@ -33,6 +33,10 @@
   color: black;
 }
 
+rect {
+  outline: none !important;
+}
+
 
 .App-link {
   color: #61dafb;

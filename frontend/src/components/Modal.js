@@ -13,6 +13,7 @@ import {
 import Select from 'react-select'
 import axios from "axios";
 import AsyncSelect from 'react-select/async';
+import './Modal.css'
 
 export default class CustomModal extends Component {
   constructor(props) {
@@ -25,6 +26,7 @@ export default class CustomModal extends Component {
       stayList: this.props.stayList,
       defaultCity: this.props.defaultCity,
       defaultStay: this.props.defaultStay,
+      showspread: this.props.activeItem.spread_over,
     };
   }
 
@@ -38,6 +40,16 @@ export default class CustomModal extends Component {
     const activeItem = { ...this.state.activeItem, [name]: value };
 
     this.setState({ activeItem });
+  };
+
+  handleSpreadOverChange = (e) => {
+    let { name, value } = e.target;
+
+    value = e.target.checked;
+
+    const activeItem = { ...this.state.activeItem, [name]: value };
+
+    this.setState({ activeItem, showspread: value });
   };
 
   handleSelect = (e) => {
@@ -72,7 +84,7 @@ export default class CustomModal extends Component {
   }
 
   render() {
-    const { toggle, onSave } = this.props;
+    const { toggle, onSave, onDelete } = this.props;
     var modal_title = this.state.model_name;
     var action_title = this.state.action_name;
 
@@ -84,7 +96,6 @@ export default class CustomModal extends Component {
     const stayList = this.state.stayList;
     var defaultCategory = categoryList.filter((item) => item.id === this.state.activeItem.category_id);
     var defaultStay = stayList.filter((item) => item.id === this.state.activeItem.stay_id);
-
 
     var form = <Form />
 
@@ -107,6 +118,19 @@ export default class CustomModal extends Component {
     } else if (modal_title === 'Expense') {
       form = (
         <Form>
+          <FormGroup>
+            <Input
+              className="checkbox-input"
+              type="checkbox"
+              id="expense-ignore"
+              name="ignore"
+              value={this.state.activeItem.ignore}
+              checked={this.state.activeItem.ignore}
+              onChange={this.handleChange}
+            />
+            <Label className="checkbox-label" for="expense-ignore">Ignore</Label>
+          </FormGroup>
+
           <FormGroup>
             <Label for="expense-date">Date</Label>
             <Input
@@ -218,6 +242,134 @@ export default class CustomModal extends Component {
             />
           </FormGroup>
 
+          <FormGroup>
+            <Input
+              className="checkbox-input"
+              type="checkbox"
+              id="expense-spread-over"
+              name="spread_over"
+              value={this.state.activeItem.spread_over}
+              checked={this.state.activeItem.spread_over}
+              onChange={this.handleSpreadOverChange}
+            />
+            <Label className="checkbox-label" for="expense-spread-over">Spread Across Dates</Label>
+          </FormGroup>
+
+
+          {this.state.showspread ?
+            <FormGroup>
+              <Label for="expense-date">Spread Start</Label>
+              <Input
+                type="date"
+                id="expense-spread-start-date"
+                name="spread_date_start"
+                value={this.state.activeItem.spread_date_start}
+                onChange={this.handleChange}
+              />
+            </FormGroup>
+            : null}
+
+          {this.state.showspread ?
+            <FormGroup>
+              <Label for="expense-date">Spread End</Label>
+              <Input
+                type="date"
+                id="expense-spread-end-date"
+                name="spread_date_end"
+                value={this.state.activeItem.spread_date_end}
+                onChange={this.handleChange}
+              />
+            </FormGroup>
+            : null}
+
+        </Form>
+      );
+    } else if (modal_title === 'Plan') {
+      form = (
+        <Form>
+
+          <FormGroup>
+            <Label for="plan-name">Label</Label>
+            <Input
+              type="text"
+              id="plan-name"
+              name="name"
+              value={this.state.activeItem.name}
+              onChange={this.handleChange}
+              placeholder="Enter plan name..."
+            />
+          </FormGroup>
+
+          <FormGroup>
+            <Label for="expense-amount">Amount</Label>
+            <Input
+              type="decimal"
+              id="expense-amount"
+              name="amount"
+              value={this.state.activeItem.amount}
+              onChange={this.handleChange}
+              placeholder="Enter expense amount..."
+            />
+          </FormGroup>
+
+          <FormGroup>
+            <Label for="plan-stay">Spread Across Stay</Label>
+            <Select
+              id="plan-stay"
+              name="stay_id"
+              className="basic-single"
+              classNamePrefix="select"
+              defaultValue={defaultStay}
+              onChange={this.handleStaySelect}
+              isLoading={isLoading}
+              isClearable={true}
+              isSearchable={isSearchable}
+              options={stayList}
+              getOptionLabel={x => x.display_name}
+              getOptionValue={x => x.id}
+            />
+          </FormGroup>
+
+          <FormGroup>
+            <Input
+              className="checkbox-input"
+              type="checkbox"
+              id="plan-spread-over"
+              name="spread_over"
+              value={this.state.activeItem.spread_over}
+              checked={this.state.activeItem.spread_over}
+              onChange={this.handleSpreadOverChange}
+            />
+            <Label className="checkbox-label" for="plan-spread-over">Spread Across Dates</Label>
+          </FormGroup>
+
+
+          {this.state.showspread ?
+            <FormGroup>
+              <Label for="plan-date">Spread Start</Label>
+              <Input
+                type="date"
+                id="plan-spread-start-date"
+                name="spread_date_start"
+                value={this.state.activeItem.spread_date_start}
+                onChange={this.handleChange}
+              />
+            </FormGroup>
+            : null}
+
+          {this.state.showspread ?
+            <FormGroup>
+              <Label for="plan-date">Spread End</Label>
+              <Input
+                type="date"
+                id="plan-spread-end-date"
+                name="spread_date_end"
+                value={this.state.activeItem.spread_date_end}
+                onChange={this.handleChange}
+              />
+            </FormGroup>
+            : null}
+
         </Form>
       );
     } else {
@@ -274,6 +426,15 @@ export default class CustomModal extends Component {
           {form}
         </ModalBody>
         <ModalFooter>
+          {(modal_title === "Plan" || modal_title === "Stay") && action_title === "Edit" ?
+            <Button
+              className="float-right"
+              color="danger"
+              onClick={() => onDelete(this.state.activeItem)}
+            >
+              Delete
+            </Button>
+            : null}
           <Button
             color="success"
             onClick={() => onSave(this.state.activeItem)}

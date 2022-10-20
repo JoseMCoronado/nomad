@@ -91,6 +91,18 @@ class ExpenseCategory(models.Model):
     plaid_id = models.CharField(max_length=255, default="")
     create_date = models.DateTimeField(auto_now_add=True)
     write_date = models.DateTimeField(auto_now=True)
+    ignore = models.BooleanField(default=False)
+    expense_classification = models.CharField(
+        max_length=255,
+        choices=[
+            ("none", "Unclassified"),
+            ("transportation", "Transportation"),
+            ("lodging", "Lodging"),
+            ("business", "Business"),
+            ("misc", "Misc"),
+        ],
+        default="misc",
+    )
 
     class Meta:
         db_table = "tracker_expense_category"
@@ -149,6 +161,10 @@ class Expense(models.Model):
         ],
         default="pending",
     )
+    ignore = models.BooleanField(default=False)
+    spread_over = models.BooleanField(default=False)
+    spread_date_start = models.DateField(default=None, null=True, blank=True)
+    spread_date_end = models.DateField(default=None, null=True, blank=True)
 
     class Meta:
         db_table = "tracker_expense"
@@ -177,7 +193,7 @@ class ExpenseItem(models.Model):
 
     class Meta:
         db_table = "tracker_expense_item"
-        ordering = ["date"]
+        ordering = ["date", "expense_id__id"]
 
 
 @receiver(pre_save, sender=Expense)
@@ -188,11 +204,29 @@ def expense_presave_handler(sender, **kwargs):
 
 @receiver(post_save, sender=Expense)
 def expense_postsave_handler(sender, **kwargs):
-    if kwargs["instance"].stay_id:
+    if kwargs["instance"].ignore:
+        create_dict = {
+            "expense_id": kwargs["instance"],
+            "date": kwargs["instance"].date,
+            "amount": 0,
+        }
+        ExpenseItem.objects.create(**create_dict)
+    elif kwargs["instance"].stay_id:
         date_start = kwargs["instance"].stay_id.date_start
         date_end = kwargs["instance"].stay_id.date_end
         diff_days = max((date_end - date_start).days, 1)
-        print(date_start, date_end, diff_days)
+        while date_start < date_end:
+            create_dict = {
+                "expense_id": kwargs["instance"],
+                "date": date_start,
+                "amount": (kwargs["instance"].amount / diff_days),
+            }
+            ExpenseItem.objects.create(**create_dict)
+            date_start += timedelta(days=1)
+    elif kwargs["instance"].spread_over:
+        date_start = kwargs["instance"].spread_date_start
+        date_end = kwargs["instance"].spread_date_end
+        diff_days = max((date_end - date_start).days, 1)
         while date_start < date_end:
             create_dict = {
                 "expense_id": kwargs["instance"],
@@ -208,3 +242,73 @@ def expense_postsave_handler(sender, **kwargs):
             "amount": kwargs["instance"].amount,
         }
         ExpenseItem.objects.create(**create_dict)
+
+
+class PlanExpense(models.Model):
+    name = models.CharField(max_length=255)
+    stay_id = models.ForeignKey(
+        TrackerStay,
+        on_delete=models.PROTECT,
+        related_name="plan_ids",
+        null=True,
+        blank=True,
+        default=None,
+    )
+    amount = models.DecimalField(max_digits=9, decimal_places=2)
+    spread_over = models.BooleanField(default=False)
+    spread_date_start = models.DateField(default=None, null=True, blank=True)
+    spread_date_end = models.DateField(default=None, null=True, blank=True)
+    create_date = models.DateTimeField(auto_now_add=True)
+    write_date = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "tracker_plan_expense"
+        ordering = ["stay_id__id"]
+
+
+class PlanExpenseItem(models.Model):
+    plan_id = models.ForeignKey(
+        PlanExpense, on_delete=models.CASCADE, related_name="item_ids"
+    )
+    date = models.DateField()
+    amount = models.DecimalField(max_digits=9, decimal_places=2)
+    create_date = models.DateTimeField(auto_now_add=True)
+    write_date = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "tracker_plan_expense_item"
+        ordering = ["date", "plan_id__id"]
+
+
+@receiver(pre_save, sender=PlanExpense)
+def plan_expense_presave_handler(sender, **kwargs):
+    items = PlanExpenseItem.objects.filter(plan_id=kwargs["instance"]).all()
+    items.delete()
+
+
+@receiver(post_save, sender=PlanExpense)
+def plan_expense_postsave_handler(sender, **kwargs):
+    if kwargs["instance"].stay_id:
+        date_start = kwargs["instance"].stay_id.date_start
+        date_end = kwargs["instance"].stay_id.date_end
+        diff_days = max((date_end - date_start).days, 1)
+        while date_start < date_end:
+            create_dict = {
+                "plan_id": kwargs["instance"],
+                "date": date_start,
+                "amount": (kwargs["instance"].amount / diff_days),
+            }
+            PlanExpenseItem.objects.create(**create_dict)
+            date_start += timedelta(days=1)
+    elif kwargs["instance"].spread_over:
+        date_start = kwargs["instance"].spread_date_start
+        date_end = kwargs["instance"].spread_date_end
+        diff_days = max((date_end - date_start).days, 1)
+        while date_start < date_end:
+            create_dict = {
+                "plan_id": kwargs["instance"],
+                "date": date_start,
+                "amount": (kwargs["instance"].amount / diff_days),
+            }
+            PlanExpenseItem.objects.create(**create_dict)
+            date_start += timedelta(days=1)

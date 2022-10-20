@@ -4,3 +4,5 @@ djangorestframework
 django-filter
 django-cors-headers
 plaid-python
+django-extensions
+Werkzeug 

@@ -25,6 +25,8 @@ from tracker.models import (
     ConfigCity,
     TrackerStay,
     ExpenseItem,
+    PlanExpense,
+    PlanExpenseItem,
 )
 from tracker.serializers import (
     ExpenseSerializer,
@@ -36,6 +38,8 @@ from tracker.serializers import (
     ConfigCitySerializer,
     TrackerStaySerializer,
     ExpenseItemSerializer,
+    PlanExpenseSerializer,
+    PlanExpenseItemSerializer,
 )
 
 import plaid
@@ -57,7 +61,7 @@ class CityPagination(PageNumberPagination):
 
 
 class ExpensePagination(PageNumberPagination):
-    page_size = 5000
+    page_size = 100000
 
 
 class ConfigCountryViewSet(ModelViewSet):
@@ -95,8 +99,39 @@ class ExpenseItemViewSet(ModelViewSet):
     serializer_class = ExpenseItemSerializer
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    filterset_fields = {"expense_id__stay_id": ["exact", "isnull"]}
+    filterset_fields = {
+        "expense_id__stay_id": ["exact", "isnull"],
+        "expense_id__spread_over": ["exact"],
+    }
     search_fields = ["expense_id"]
+
+
+class PlanExpenseViewSet(ModelViewSet):
+    queryset = PlanExpense.objects.select_related(
+        "stay_id__city_id__state_id__country_id"
+    ).all()
+    serializer_class = PlanExpenseSerializer
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filterset_fields = {
+        "stay_id": ["exact", "isnull"],
+        "spread_over": ["exact"],
+    }
+    search_fields = ["stay_id"]
+
+
+class PlanExpenseItemViewSet(ModelViewSet):
+    queryset = PlanExpenseItem.objects.select_related(
+        "plan_id__stay_id__city_id__state_id__country_id"
+    ).all()
+    serializer_class = PlanExpenseItemSerializer
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filterset_fields = {
+        "plan_id__stay_id": ["exact", "isnull"],
+        "plan_id__spread_over": ["exact"],
+    }
+    search_fields = ["plan_id"]
 
 
 class ConfigParameterViewSet(ModelViewSet):
@@ -168,8 +203,10 @@ def generate_plaid_client():
 @api_view(["GET", "POST"])
 def testEndpoint(request, *args, **kwargs):
     if request.method == "GET":
-        message = "%s" % ("ok")
-        return Response(message)
+        earliest_stay = TrackerStay.objects.earliest("date_start").date_start
+        import_date = "2022-09-15"
+        import_dt = datetime.strptime(import_date, "%Y-%m-%d").date()
+        return Response(earliest_stay > import_dt)
     if request.method == "POST":
         return Response(request.data)
 
@@ -179,6 +216,7 @@ def get_dates(request, *args, **kwargs):
     if request.method == "GET":
         heatmap_data = request.GET.get("viewHeatmapState", "expenses")
         heatmap_expense_data = request.GET.get("viewHeatmapExpensesState", "all")
+        dailySpendComputation = float(request.GET.get("dailySpendComputation", 0))
         all_expense_data = heatmap_expense_data in ["all", "none"]
         non_misc_budget = 166
         misc_budget = 196
@@ -191,6 +229,7 @@ def get_dates(request, *args, **kwargs):
             if heatmap_expense_data in ["all", "misc"]:
                 budget_message += "Misc Budget: %s<br/>" % (misc_budget,)
                 budget += misc_budget
+            budget_message += "Total Budget: %s<br/>" % (budget)
         dateList = []
         stays = list(
             TrackerStay.objects.select_related(
@@ -207,6 +246,11 @@ def get_dates(request, *args, **kwargs):
             expenses = list(
                 ExpenseItem.objects.select_related("expense_id__category_id").all()
             )
+        plans = list(
+            PlanExpenseItem.objects.select_related(
+                "plan_id__stay_id__city_id__state_id__country_id"
+            ).all()
+        )
         date_start_list = [x.date_start for x in stays]
         date_end_list = [x.date_end for x in stays]
         # TODO: Handle when there is no stay do not allow person to retrieve expenses.
@@ -232,9 +276,33 @@ def get_dates(request, *args, **kwargs):
                     expenses,
                 )
             ]
-            amount = sum(expense_list)
+            plan_list = [
+                planobj.amount
+                for planobj in filter(
+                    lambda plan: date == plan.date,
+                    plans,
+                )
+            ]
+            actual_amount = round(float(sum(expense_list)), 2)
+            plan_amount = round(float(sum(plan_list)), 2)
+            amount = actual_amount + plan_amount
+            fx_date = date > datetime.now().date()
+            if fx_date:
+                amount += dailySpendComputation
+            amount = round(amount, 2)
             count = 0
             if heatmap_data == "expenses":
+                message += "Total Actual: %s<br/>" % (actual_amount)
+                message += "Total Planned: %s<br/>" % (plan_amount)
+                if fx_date:
+                    message += "Daily Fx: %s<br/>" % (round(dailySpendComputation, 2))
+                message += "Total Expenses: %s<br/>" % (amount)
+                ratio = amount / budget
+                message += "Exp. / Budget Ratio: %s%s<br/>" % (
+                    round(ratio * 100, 2),
+                    "%",
+                )
+                message += "Rem. Budget: %s<br/>" % (budget - amount)
                 if budget <= 0:
                     if (amount) > 100:
                         count = 9
@@ -245,7 +313,6 @@ def get_dates(request, *args, **kwargs):
                     elif (amount) > 0:
                         count = 6
                 else:
-                    ratio = amount / budget
                     if ratio >= 2:
                         count = 9
                     elif ratio >= 1.75:
@@ -338,9 +405,9 @@ def get_dates(request, *args, **kwargs):
                 "dateString": date_string,
                 "cityStay": city_stay,
                 "stayId": stay_record,
-                "totalAmount": amount,
+                "totalAmount": round(amount, 2),
                 "budget": budget,
-                "budgetDiff": budget_diff,
+                "budgetDiff": round(budget_diff, 2),
                 "count": count,
                 "schengenCount": schengen_count,
                 "transportMsg": transport_msg,
@@ -569,6 +636,8 @@ def getPlaidTransactionsForDates(request):
                         "plaid_id": transaction["category_id"],
                     }
                     category_id = ExpenseCategory.objects.create(**categ_values)
+                ignore = category_id.ignore
+                expense_classification = category_id.expense_classification
                 expense = Expense.objects.filter(
                     transaction_id=transaction["transaction_id"]
                 )
@@ -589,6 +658,12 @@ def getPlaidTransactionsForDates(request):
                 if expense and expense[0].state not in ["ignore"]:
                     expense.update(**values)
                 else:
+                    values.update(
+                        {
+                            "expense_classification": expense_classification,
+                            "ignore": ignore,
+                        }
+                    )
                     Expense.objects.create(**values)
         message += "%s Line(s) Synced" % (transaction_count)
         return Response(message)
@@ -601,6 +676,7 @@ def getPlaidTransactions(request):
         client, client_id = generate_plaid_client()
         plaid_items = PlaidItem.objects.all()
         transaction_count = 0
+        earliest_stay = TrackerStay.objects.earliest("date_start").date_start
         for item in plaid_items:
             cursor = item.transaction_sync_cursor
             added = []
@@ -629,6 +705,9 @@ def getPlaidTransactions(request):
                 )
             transaction_count += len(added)
             for transaction in added:
+                transaction_date = transaction["date"]
+                if transaction_date < earliest_stay:
+                    continue
                 expenese_category = ExpenseCategory.objects.filter(
                     plaid_id=transaction["category_id"]
                 )
@@ -642,6 +721,8 @@ def getPlaidTransactions(request):
                     }
                     category_id = ExpenseCategory.objects.create(**categ_values)
 
+                ignore = category_id.ignore
+                expense_classification = category_id.expense_classification
                 expense = Expense.objects.filter(
                     transaction_id=transaction["transaction_id"]
                 )
@@ -662,6 +743,12 @@ def getPlaidTransactions(request):
                 if expense and expense[0].state not in ["ignore"]:
                     expense.update(**values)
                 else:
+                    values.update(
+                        {
+                            "expense_classification": expense_classification,
+                            "ignore": ignore,
+                        }
+                    )
                     Expense.objects.create(**values)
         message += "Sync Completed %s Transactions" % (transaction_count)
         return Response(message)

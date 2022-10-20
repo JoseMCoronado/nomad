@@ -12,6 +12,8 @@ router.register("states", views.ConfigStateViewSet)
 router.register("cities", views.ConfigCityViewSet)
 router.register("stays", views.TrackerStayViewSet)
 router.register("items", views.ExpenseItemViewSet)
+router.register("plan", views.PlanExpenseViewSet)
+router.register("planitem", views.PlanExpenseItemViewSet)
 
 urlpatterns = [
     path(r"", include(router.urls)),
